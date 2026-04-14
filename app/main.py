@@ -57,7 +57,7 @@ async def serve_ui():
     return HTMLResponse(content=index_path.read_text(encoding="utf-8"))
 
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 async def healthcheck():
     """Lightweight health endpoint for container platforms."""
     return {"status": "ok"}

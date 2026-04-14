@@ -27,11 +27,18 @@ async def search_amazon(query: str) -> list[Product]:
 
     try:
         await page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
-        # Wait for search result cards
-        await page.wait_for_selector(
-            'div[data-component-type="s-search-result"]',
-            timeout=10000,
-        )
+        # Wait for search result cards (use full timeout for slow containers)
+        try:
+            await page.wait_for_selector(
+                'div[data-component-type="s-search-result"]',
+                timeout=timeout_ms,
+            )
+        except Exception:
+            # Amazon may show CAPTCHA or different layout — try waiting for any results
+            await page.wait_for_selector(
+                'div.s-main-slot, div#search, div[data-cel-widget]',
+                timeout=timeout_ms,
+            )
 
         raw = await page.evaluate("""(maxResults) => {
             const cards = document.querySelectorAll('div[data-component-type="s-search-result"]');

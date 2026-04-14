@@ -1,10 +1,13 @@
 """Scraper for Amazon India product search results using Playwright."""
 
+import logging
 import urllib.parse
 
-from app.browser import get_browser
+from app.browser import get_browser, new_stealth_context
 from app.config import REQUEST_TIMEOUT, MAX_RESULTS_PER_SITE
 from app.models import Product
+
+logger = logging.getLogger(__name__)
 
 
 async def search_amazon(query: str) -> list[Product]:
@@ -14,31 +17,37 @@ async def search_amazon(query: str) -> list[Product]:
     timeout_ms = int(REQUEST_TIMEOUT * 1000)
 
     browser = await get_browser()
-    context = await browser.new_context(
-        user_agent=(
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/124.0.0.0 Safari/537.36"
-        ),
-        viewport={"width": 1366, "height": 768},
-        locale="en-US",
-    )
+    context = await new_stealth_context(browser)
     page = await context.new_page()
 
     try:
-        await page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
-        # Wait for search result cards (use full timeout for slow containers)
+        # Navigate and wait for full load
+        await page.goto(url, wait_until="networkidle", timeout=timeout_ms)
+
+        # Log page title for diagnostics (helps identify CAPTCHA pages)
+        title = await page.title()
+        logger.info("Amazon page title: %s", title)
+
+        # Check if Amazon is showing a CAPTCHA
+        captcha = await page.query_selector('form[action*="validateCaptcha"], input#captchacharacters')
+        if captcha:
+            logger.warning("Amazon CAPTCHA detected — attempting to work around")
+            # Try reloading once
+            await page.reload(wait_until="networkidle", timeout=timeout_ms)
+            captcha = await page.query_selector('form[action*="validateCaptcha"], input#captchacharacters')
+            if captcha:
+                return []  # still blocked, return empty
+
+        # Wait for search result cards
         try:
             await page.wait_for_selector(
                 'div[data-component-type="s-search-result"]',
-                timeout=timeout_ms,
+                timeout=15000,
             )
         except Exception:
-            # Amazon may show CAPTCHA or different layout — try waiting for any results
-            await page.wait_for_selector(
-                'div.s-main-slot, div#search, div[data-cel-widget]',
-                timeout=timeout_ms,
-            )
+            logger.warning("Primary Amazon selector not found, trying fallback")
+            # Could be a different page layout (no results, different region, etc.)
+            pass
 
         raw = await page.evaluate("""(maxResults) => {
             const cards = document.querySelectorAll('div[data-component-type="s-search-result"]');

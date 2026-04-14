@@ -2,7 +2,7 @@
 
 import urllib.parse
 
-from app.browser import get_browser
+from app.browser import get_browser, new_stealth_context
 from app.config import REQUEST_TIMEOUT, MAX_RESULTS_PER_SITE
 from app.models import Product
 
@@ -14,15 +14,7 @@ async def search_flipkart(query: str) -> list[Product]:
     timeout_ms = int(REQUEST_TIMEOUT * 1000)
 
     browser = await get_browser()
-    context = await browser.new_context(
-        user_agent=(
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/124.0.0.0 Safari/537.36"
-        ),
-        viewport={"width": 1366, "height": 768},
-        locale="en-US",
-    )
+    context = await new_stealth_context(browser)
     page = await context.new_page()
 
     try:

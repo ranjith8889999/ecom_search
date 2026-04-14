@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import os
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -21,17 +22,22 @@ if sys.platform == "win32":
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+PREWARM_BROWSER = os.getenv("PREWARM_BROWSER", "0").strip().lower() in {"1", "true", "yes", "on"}
 
 
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     """Startup / shutdown lifecycle – manages browser."""
-    logger.info("Starting up – warming browser…")
-    try:
-        await get_browser()  # pre-launch so first request is fast
-        logger.info("Browser ready.")
-    except Exception as exc:
-        logger.warning("Browser pre-warm failed (will retry on first request): %s", exc)
+    logger.info("Starting up application...")
+    if PREWARM_BROWSER:
+        logger.info("Browser pre-warm enabled.")
+        try:
+            await get_browser()  # optional pre-launch so first request is fast
+            logger.info("Browser ready.")
+        except Exception as exc:
+            logger.warning("Browser pre-warm failed (will retry on first request): %s", exc)
+    else:
+        logger.info("Browser pre-warm disabled for faster container startup.")
     yield
     logger.info("Shutting down – closing browser…")
     await shutdown_browser()
@@ -49,6 +55,12 @@ async def serve_ui():
     """Serve the main search UI."""
     index_path = STATIC_DIR / "index.html"
     return HTMLResponse(content=index_path.read_text(encoding="utf-8"))
+
+
+@app.get("/health")
+async def healthcheck():
+    """Lightweight health endpoint for container platforms."""
+    return {"status": "ok"}
 
 
 @app.get("/api/search")

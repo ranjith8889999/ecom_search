@@ -47,15 +47,16 @@ RUN playwright install chromium && playwright install-deps chromium
 COPY app/ ./app/
 COPY static/ ./static/
 
-# EasyPanel exposes PORT env var; default to 8000
-ENV PORT=8000
+# Hostinger / EasyPanel typically expects the app on port 80 unless PORT is overridden
+ENV PORT=80 \
+    PREWARM_BROWSER=0
 
-# Expose the port
-EXPOSE ${PORT}
+# Expose the default HTTP port
+EXPOSE 80
 
-# Health check for EasyPanel monitoring
+# Health check for container monitoring
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT}/ || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT}/health || exit 1
 
-# Run with uvicorn — bind to 0.0.0.0 so EasyPanel reverse proxy can reach it
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --workers 1"]
+# Run with uvicorn — bind to 0.0.0.0 so the reverse proxy can reach it
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --workers 1"]

@@ -19,7 +19,6 @@ async def get_browser() -> Browser:
                 "--disable-setuid-sandbox",
                 "--disable-dev-shm-usage",
                 "--disable-gpu",
-                "--single-process",
             ],
         )
     return _browser

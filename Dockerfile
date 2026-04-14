@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libatk1.0-0 \
     libcups2 \
     libdbus-1-3 \
+    dbus \
     libdrm2 \
     libgbm1 \
     libglib2.0-0 \
